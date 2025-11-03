@@ -117,21 +117,60 @@
     const audioToggle = document.getElementById('audioToggle');
     const iconSpan = audioToggle.querySelector('span');
     let isPlaying = false;
+    let userInteracted = false;
 
-    // 페이지 로드 시 자동 재생 시도
+    // 오디오 미리 로드
+    audio.preload = 'auto';
+    audio.volume = 1.0;
+
+    // 페이지 로드 시 즉시 재생 시도
     window.addEventListener('DOMContentLoaded', () => {
-        audio.play().then(() => {
-            isPlaying = true;
-            iconSpan.textContent = 'volume_up';
-        }).catch(error => {
-            console.log('자동 재생이 차단되었습니다. 사용자 인터랙션이 필요합니다.', error);
-            isPlaying = false;
-            iconSpan.textContent = 'volume_off';
-        });
+        // 즉시 재생 시도
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                isPlaying = true;
+                iconSpan.textContent = 'volume_up';
+                userInteracted = true;
+            }).catch(() => {
+                // 자동 재생 차단 시, 사용자 인터랙션 대기
+                isPlaying = false;
+                iconSpan.textContent = 'volume_off';
+            });
+        }
     });
 
+    // 사용자 인터랙션 감지 후 자동 재생 (한 번만 실행)
+    const startAudioOnInteraction = () => {
+        if (!userInteracted && !isPlaying) {
+            audio.play().then(() => {
+                isPlaying = true;
+                iconSpan.textContent = 'volume_up';
+                userInteracted = true;
+                // 이벤트 리스너 제거
+                removeInteractionListeners();
+            }).catch(() => {
+                // 재생 실패해도 계속 시도
+            });
+        }
+    };
+
+    // 인터랙션 리스너 제거 함수
+    const removeInteractionListeners = () => {
+        document.removeEventListener('click', startAudioOnInteraction);
+        document.removeEventListener('touchstart', startAudioOnInteraction);
+        document.removeEventListener('keydown', startAudioOnInteraction);
+    };
+
+    // 여러 인터랙션 이벤트 리스너 추가
+    document.addEventListener('click', startAudioOnInteraction, { once: true });
+    document.addEventListener('touchstart', startAudioOnInteraction, { once: true });
+    document.addEventListener('keydown', startAudioOnInteraction, { once: true });
+
     // 토글 버튼 클릭 이벤트
-    audioToggle.addEventListener('click', () => {
+    audioToggle.addEventListener('click', (e) => {
+        e.stopPropagation(); // 이벤트 전파 방지
+        userInteracted = true;
         if (isPlaying) {
             audio.pause();
             isPlaying = false;
